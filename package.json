@@ -1,0 +1,55 @@
+{
+  "name": "@opengspace/signupsource",
+  "version": "0.1.0",
+  "description": "A lightweight component to collect information about where users come from",
+  "type": "module",
+  "main": "dist/signupsource.umd.js",
+  "module": "dist/signupsource.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/signupsource.es.js",
+      "require": "./dist/signupsource.umd.js"
+    },
+    "./dist/style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && npm run build:lib",
+    "build:lib": "vite build --config vite.lib.config.js",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "signupsource",
+    "user tracking",
+    "analytics",
+    "openg-app",
+    "openg space",
+    "modal",
+    "user survey"
+  ],
+  "author": "window@openg.space",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opengspace/SignUpSource.git"
+  },
+  "homepage": "https://opengspace.github.io/SignUpSource",
+  "bugs": {
+    "url": "https://github.com/opengspace/SignUpSource/issues"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.1.4"
+  }
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignUpSource Demo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>SignUpSource Demo</h1>
+        <p>This demo shows how the SignUpSource modal works.</p>
+        <button id="trigger-btn">Simulate New User</button>
+    </div>
+
+    <div id="signupsource-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Where did you hear about us?</h2>
+            <p id="modal-description">Please let us know how you found our website.</p>
+            
+            <div class="check-items">
+                <div class="check-item">
+                    <input type="checkbox" id="item1" name="source" value="google">
+                    <label for="item1">Google Search</label>
+                </div>
+                <div class="check-item">
+                    <input type="checkbox" id="item2" name="source" value="friend">
+                    <label for="item2">Friend Recommendation</label>
+                </div>
+                <div class="check-item">
+                    <input type="checkbox" id="item3" name="source" value="social">
+                    <label for="item3">Social Media</label>
+                </div>
+                <div class="check-item">
+                    <input type="checkbox" id="item4" name="source" value="blog">
+                    <label for="item4">Blog or Article</label>
+                </div>
+                <div class="check-item">
+                    <input type="checkbox" id="item5" name="source" value="other">
+                    <label for="item5">Other</label>
+                </div>
+            </div>
+            
+            <button id="modal-button">Submit</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
