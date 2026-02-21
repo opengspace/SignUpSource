@@ -7,6 +7,27 @@ export { SignUpSource, useSignUpSource };
 // For standalone use (via script tag)
 if (typeof window !== 'undefined') {
   window.signupsource = (options) => {
+    // Default options
+    const {
+      id = '',
+      title = 'Where did you hear about us?',
+      description = 'Please let us know how you found our website.',
+      buttonText = 'Submit',
+      checkItems = [
+        { id: 'google', label: 'Google Search' },
+        { id: 'social', label: 'Social Media' },
+        { id: 'friend', label: 'Friend Recommendation' },
+        { id: 'blog', label: 'Blog or Article' },
+        { id: 'other', label: 'Other' }
+      ],
+      callback,
+      apiEndpoint = '',
+      apiMethod = 'POST',
+      apiHeaders = {},
+      storeLocal = false,
+      localStorageKey = 'signupsource_data'
+    } = options || {};
+
     // Create modal container if it doesn't exist
     let container = document.getElementById('signupsource-container');
     if (!container) {
@@ -24,22 +45,6 @@ if (typeof window !== 'undefined') {
     modalContent.className = 'signupsource-modal-content';
     modalContent.style.cssText = 'background-color:white; padding:30px; border-radius:8px; box-shadow:0 5px 20px rgba(0,0,0,0.2); max-width:500px; width:90%; position:relative; animation:signupsource-slideDown 0.4s;';
     
-    // Get options
-    const { 
-      id = '', 
-      title = 'Where did you hear about us?', 
-      description = 'Please let us know how you found our website.',
-      buttonText = 'Submit',
-      checkItems = [
-        { id: 'google', label: 'Google Search' },
-        { id: 'social', label: 'Social Media' },
-        { id: 'friend', label: 'Friend Recommendation' },
-        { id: 'blog', label: 'Blog or Article' },
-        { id: 'other', label: 'Other' }
-      ],
-      callback
-    } = options || {};
-
     // Create title
     const titleEl = document.createElement('h2');
     titleEl.className = 'signupsource-title';
@@ -57,11 +62,12 @@ if (typeof window !== 'undefined') {
     itemsContainer.className = 'signupsource-check-items';
     itemsContainer.style.cssText = 'margin-bottom:25px;';
     
-    // Create button
+    // Create submit button
     const button = document.createElement('button');
     button.className = 'signupsource-button';
     button.style.cssText = 'width:100%; padding:12px; font-size:16px; font-weight:bold; background-color:#4a69bd; color:white; border:none; border-radius:5px; cursor:pointer; transition:background-color 0.3s;';
     button.textContent = buttonText;
+    button.disabled = true;
     
     // Store other input for later reference
     let otherInput = null;
@@ -120,20 +126,80 @@ if (typeof window !== 'undefined') {
       itemDiv.appendChild(otherInputContainer);
       itemsContainer.appendChild(itemDiv);
     });
+
+    // Function to send data to API
+    const sendToApi = async (data) => {
+      if (!apiEndpoint) return;
+
+      button.disabled = true;
+      button.textContent = 'Sending...';
+      
+      try {
+        const payload = {
+          websiteId: id,
+          sources: data,
+          timestamp: new Date().toISOString(),
+          url: window.location.href,
+          userAgent: navigator.userAgent
+        };
+
+        const options = {
+          method: apiMethod,
+          headers: {
+            'Content-Type': 'application/json',
+            ...apiHeaders
+          }
+        };
+
+        if (apiMethod === 'POST') {
+          options.body = JSON.stringify(payload);
+        }
+
+        const response = await fetch(apiEndpoint, options);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        console.log('SignUpSource: Data sent to API successfully');
+      } catch (error) {
+        console.error('SignUpSource: Failed to send data to API:', error);
+      } finally {
+        button.textContent = buttonText;
+        button.disabled = false;
+      }
+    };
+
+    // Function to store data locally
+    const storeLocally = (data) => {
+      if (!storeLocal) return;
+
+      try {
+        const existingData = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+        const newEntry = {
+          websiteId: id,
+          sources: data,
+          timestamp: new Date().toISOString(),
+          url: window.location.href
+        };
+        existingData.push(newEntry);
+        localStorage.setItem(localStorageKey, JSON.stringify(existingData));
+        console.log('SignUpSource: Data stored locally');
+      } catch (error) {
+        console.error('SignUpSource: Failed to store data locally:', error);
+      }
+    };
     
     // Add event listener to button
     button.addEventListener('click', () => {
       const selectedItems = [];
-      let hasOther = false;
-      let otherValue = '';
       
       // Collect checked items
       checkItems.forEach(item => {
         const checkbox = document.getElementById(`signupsource-${item.id}`);
         if (checkbox && checkbox.checked) {
           if (item.id === 'other') {
-            hasOther = true;
-            otherValue = otherInput ? otherInput.value.trim() : '';
+            const otherValue = otherInput ? otherInput.value.trim() : '';
             if (otherValue) {
               selectedItems.push({
                 id: item.id,
@@ -149,20 +215,33 @@ if (typeof window !== 'undefined') {
           }
         }
       });
+
+      const submissionData = {
+        websiteId: id,
+        sources: selectedItems,
+        timestamp: new Date().toISOString()
+      };
       
-      // Call callback function if provided
+      // Call callback if provided
       if (callback && typeof callback === 'function') {
-        callback(selectedItems);
-      } else {
-        // Default callback - send to server
+        callback(submissionData);
+      }
+      
+      // Send to API if configured
+      if (apiEndpoint) {
+        sendToApi(selectedItems);
+      }
+      
+      // Store locally if enabled
+      if (storeLocal) {
+        storeLocally(selectedItems);
+      }
+
+      // Default behavior - log to console if no API and no callback
+      if (!callback && !apiEndpoint && !storeLocal) {
         console.log('SignUpSource: Sending data to server');
         console.log('Website ID:', id);
         console.log('User checked items:', selectedItems);
-        
-        // Simulate sending data to server
-        setTimeout(() => {
-          console.log('SignUpSource: Data sent successfully');
-        }, 500);
       }
       
       // Remove modal

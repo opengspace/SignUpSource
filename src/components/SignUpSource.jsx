@@ -13,6 +13,11 @@ import './SignUpSource.css';
  * @param {Function} props.callback - Callback function when user submits selections
  * @param {boolean} props.isOpen - Whether the modal is open
  * @param {Function} props.onClose - Function to close the modal
+ * @param {string} props.apiEndpoint - API endpoint to send data to
+ * @param {string} props.apiMethod - HTTP method (POST or GET), default POST
+ * @param {Object} props.apiHeaders - Custom headers for API request
+ * @param {boolean} props.storeLocal - Store data in localStorage
+ * @param {string} props.localStorageKey - Key for localStorage, default 'signupsource_data'
  */
 const SignUpSource = ({ 
   id = '',
@@ -28,10 +33,16 @@ const SignUpSource = ({
   ],
   callback,
   isOpen,
-  onClose
+  onClose,
+  apiEndpoint = '',
+  apiMethod = 'POST',
+  apiHeaders = {},
+  storeLocal = false,
+  localStorageKey = 'signupsource_data'
 }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [otherSource, setOtherSource] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const otherInputRef = useRef(null);
 
   // Reset selected items when modal opens
@@ -69,6 +80,73 @@ const SignUpSource = ({
     }
   };
 
+  // Send data to API endpoint
+  const sendToApi = async (data) => {
+    if (!apiEndpoint) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      const payload = {
+        websiteId: id,
+        sources: data,
+        timestamp: new Date().toISOString(),
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      };
+
+      const options = {
+        method: apiMethod,
+        headers: {
+          'Content-Type': 'application/json',
+          ...apiHeaders
+        }
+      };
+
+      if (apiMethod === 'POST') {
+        options.body = JSON.stringify(payload);
+      } else {
+        // For GET, append data as query params
+        const params = new URLSearchParams(payload).toString();
+        const separator = apiEndpoint.includes('?') ? '&' : '?';
+        // eslint-disable-next-line no-param-reassign
+        apiEndpoint + separator + params;
+      }
+
+      const response = await fetch(apiEndpoint, options);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log('SignUpSource: Data sent to API successfully');
+    } catch (error) {
+      console.error('SignUpSource: Failed to send data to API:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Store data in localStorage
+  const storeLocally = (data) => {
+    if (!storeLocal) return;
+
+    try {
+      const existingData = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+      const newEntry = {
+        websiteId: id,
+        sources: data,
+        timestamp: new Date().toISOString(),
+        url: typeof window !== 'undefined' ? window.location.href : ''
+      };
+      existingData.push(newEntry);
+      localStorage.setItem(localStorageKey, JSON.stringify(existingData));
+      console.log('SignUpSource: Data stored locally');
+    } catch (error) {
+      console.error('SignUpSource: Failed to store data locally:', error);
+    }
+  };
+
   // Handle form submission
   const handleSubmit = () => {
     let itemsToSend = [...selectedItems];
@@ -82,23 +160,42 @@ const SignUpSource = ({
         return item;
       });
     }
+
+    // Prepare the final data
+    const submissionData = {
+      websiteId: id,
+      sources: itemsToSend,
+      timestamp: new Date().toISOString()
+    };
     
+    // Call custom callback if provided
     if (callback && typeof callback === 'function') {
-      callback(itemsToSend);
-    } else {
-      // Default behavior - log to console
+      callback(submissionData);
+    }
+    
+    // Send to API endpoint if configured
+    if (apiEndpoint) {
+      sendToApi(itemsToSend);
+    }
+    
+    // Store locally if enabled
+    if (storeLocal) {
+      storeLocally(itemsToSend);
+    }
+
+    // Default behavior - log to console if no API and no callback
+    if (!callback && !apiEndpoint && !storeLocal) {
       console.log('SignUpSource: Sending data to server');
       console.log('Website ID:', id);
       console.log('User checked items:', itemsToSend);
-      
-      // Simulate sending data to server
-      setTimeout(() => {
-        console.log('SignUpSource: Data sent successfully');
-      }, 500);
     }
     
     onClose();
   };
+
+  // Check if submit should be disabled
+  const isOtherSelected = selectedItems.some(item => item.id === 'other');
+  const isSubmitDisabled = isOtherSelected && otherSource.trim() === '';
 
   if (!isOpen) return null;
 
@@ -137,13 +234,13 @@ const SignUpSource = ({
         <button 
           className="signupsource-button"
           onClick={handleSubmit}
-          disabled={selectedItems.some(item => item.id === 'other') && otherSource.trim() === ''}
+          disabled={isSubmitDisabled || isSubmitting}
         >
-          {buttonText}
+          {isSubmitting ? 'Sending...' : buttonText}
         </button>
       </div>
     </div>
   );
 };
 
-export default SignUpSource; 
+export default SignUpSource;

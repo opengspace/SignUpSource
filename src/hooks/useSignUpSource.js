@@ -11,6 +11,11 @@ import { useState, useEffect } from 'react';
  * @param {Array} options.checkItems - Array of items users can select
  * @param {Function} options.callback - Callback function when user submits selections
  * @param {boolean} options.showOnlyOnce - Whether to show the modal only once per user
+ * @param {string} options.apiEndpoint - API endpoint to send data to
+ * @param {string} options.apiMethod - HTTP method (POST or GET)
+ * @param {Object} options.apiHeaders - Custom headers for API request
+ * @param {boolean} options.storeLocal - Store data in localStorage
+ * @param {string} options.localStorageKey - Key for localStorage
  * @returns {Object} - Hook return object
  */
 const useSignUpSource = (options = {}) => {
@@ -30,7 +35,12 @@ const useSignUpSource = (options = {}) => {
       { id: 'other', label: 'Other' }
     ],
     callback,
-    showOnlyOnce = true
+    showOnlyOnce = true,
+    apiEndpoint = '',
+    apiMethod = 'POST',
+    apiHeaders = {},
+    storeLocal = false,
+    localStorageKey = 'signupsource_data'
   } = options;
 
   // Check if the user is new
@@ -44,6 +54,67 @@ const useSignUpSource = (options = {}) => {
     }
   }, [hasShown]);
 
+  // Function to send data to API endpoint
+  const sendToApi = async (data) => {
+    if (!apiEndpoint) return false;
+
+    try {
+      const payload = {
+        websiteId: id,
+        sources: data,
+        timestamp: new Date().toISOString(),
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      };
+
+      const options = {
+        method: apiMethod,
+        headers: {
+          'Content-Type': 'application/json',
+          ...apiHeaders
+        }
+      };
+
+      if (apiMethod === 'POST') {
+        options.body = JSON.stringify(payload);
+      }
+
+      const response = await fetch(apiEndpoint, options);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log('SignUpSource: Data sent to API successfully');
+      return true;
+    } catch (error) {
+      console.error('SignUpSource: Failed to send data to API:', error);
+      return false;
+    }
+  };
+
+  // Function to store data locally
+  const storeLocally = (data) => {
+    if (!storeLocal) return false;
+
+    try {
+      const existingData = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+      const newEntry = {
+        websiteId: id,
+        sources: data,
+        timestamp: new Date().toISOString(),
+        url: typeof window !== 'undefined' ? window.location.href : ''
+      };
+      existingData.push(newEntry);
+      localStorage.setItem(localStorageKey, JSON.stringify(existingData));
+      console.log('SignUpSource: Data stored locally');
+      return true;
+    } catch (error) {
+      console.error('SignUpSource: Failed to store data locally:', error);
+      return false;
+    }
+  };
+
   // Handle modal closing
   const closeModal = () => {
     setIsOpen(false);
@@ -55,20 +126,33 @@ const useSignUpSource = (options = {}) => {
   };
 
   // Handle user selections
-  const handleSubmit = (selectedItems) => {
+  const handleSubmit = async (selectedItems) => {
+    const submissionData = {
+      websiteId: id,
+      sources: selectedItems,
+      timestamp: new Date().toISOString()
+    };
+    
     // Call the provided callback
     if (callback && typeof callback === 'function') {
-      callback(selectedItems);
-    } else {
-      // Default behavior - send to server
+      callback(submissionData);
+    }
+    
+    // Send to API if configured
+    if (apiEndpoint) {
+      await sendToApi(selectedItems);
+    }
+    
+    // Store locally if enabled
+    if (storeLocal) {
+      storeLocally(selectedItems);
+    }
+
+    // Default behavior - log to console if no API and no callback
+    if (!callback && !apiEndpoint && !storeLocal) {
       console.log('SignUpSource: Sending data to server');
       console.log('Website ID:', id);
       console.log('User checked items:', selectedItems);
-      
-      // Simulate sending data to server
-      setTimeout(() => {
-        console.log('SignUpSource: Data sent successfully');
-      }, 500);
     }
     
     // Close the modal
@@ -99,9 +183,14 @@ const useSignUpSource = (options = {}) => {
       checkItems,
       callback: handleSubmit,
       isOpen,
-      onClose: closeModal
+      onClose: closeModal,
+      apiEndpoint,
+      apiMethod,
+      apiHeaders,
+      storeLocal,
+      localStorageKey
     }
   };
 };
 
-export default useSignUpSource; 
+export default useSignUpSource;
