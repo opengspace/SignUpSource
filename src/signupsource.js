@@ -10,23 +10,85 @@ if (typeof window !== 'undefined') {
     // Default options
     const {
       id = '',
-      title = 'Where did you hear about us?',
-      description = 'Please let us know how you found our website.',
-      buttonText = 'Submit',
-      checkItems = [
-        { id: 'google', label: 'Google Search' },
-        { id: 'social', label: 'Social Media' },
-        { id: 'friend', label: 'Friend Recommendation' },
-        { id: 'blog', label: 'Blog or Article' },
-        { id: 'other', label: 'Other' }
-      ],
+      title = '',
+      description = '',
+      buttonText = '',
+      checkItems = [],
       callback,
       apiEndpoint = '',
       apiMethod = 'POST',
       apiHeaders = {},
       storeLocal = false,
-      localStorageKey = 'signupsource_data'
+      localStorageKey = 'signupsource_data',
+      language = 'auto',
+      translations = {}
     } = options || {};
+
+    // Default translations
+    const defaultTranslations = {
+      en: {
+        title: 'Where did you hear about us?',
+        description: 'Please let us know how you found our website.',
+        buttonText: 'Submit',
+        placeholder: 'Please specify',
+        sending: 'Sending...',
+        defaultCheckItems: [
+          { id: 'google', label: 'Google Search' },
+          { id: 'social', label: 'Social Media' },
+          { id: 'friend', label: 'Friend Recommendation' },
+          { id: 'blog', label: 'Blog or Article' },
+          { id: 'other', label: 'Other' }
+        ]
+      },
+      zh: {
+        title: '您是从哪里了解到我们的？',
+        description: '请告诉我们您是如何找到我们的网站的。',
+        buttonText: '提交',
+        placeholder: '请输入其他来源',
+        sending: '提交中...',
+        defaultCheckItems: [
+          { id: 'google', label: '谷歌搜索' },
+          { id: 'social', label: '社交媒体' },
+          { id: 'friend', label: '朋友推荐' },
+          { id: 'blog', label: '博客或文章' },
+          { id: 'other', label: '其他' }
+        ]
+      },
+      ja: {
+        title: 'どこで私たちを知りましたか？',
+        description: 'どのように우리 사이트를 찾으셨는지 알려주세요.',
+        buttonText: '送信',
+        placeholder: '具体的に入力',
+        sending: '送信中...',
+        defaultCheckItems: [
+          { id: 'google', label: 'Google検索' },
+          { id: 'social', label: 'ソーシャルメディア' },
+          { id: 'friend', label: '友人のおすすめ' },
+          { id: 'blog', label: 'ブログ・記事' },
+          { id: 'other', label: 'その他' }
+        ]
+      }
+    };
+
+    // Determine language
+    const getLanguage = () => {
+      if (language !== 'auto') return language;
+      const browserLang = navigator.language || navigator.userLanguage;
+      if (browserLang.startsWith('zh')) return 'zh';
+      if (browserLang.startsWith('ja')) return 'ja';
+      return 'en';
+    };
+
+    const lang = getLanguage();
+    const t = { ...defaultTranslations[lang], ...translations };
+
+    // Resolve values
+    const resolvedTitle = title || t.title;
+    const resolvedDescription = description || t.description;
+    const resolvedButtonText = buttonText || t.buttonText;
+    const resolvedPlaceholder = t.placeholder;
+    const resolvedSending = t.sending;
+    const resolvedCheckItems = checkItems.length > 0 ? checkItems : t.defaultCheckItems;
 
     // Create modal container if it doesn't exist
     let container = document.getElementById('signupsource-container');
@@ -49,13 +111,13 @@ if (typeof window !== 'undefined') {
     const titleEl = document.createElement('h2');
     titleEl.className = 'signupsource-title';
     titleEl.style.cssText = 'font-size:24px; margin-bottom:15px; color:#2a2a72;';
-    titleEl.textContent = title;
+    titleEl.textContent = resolvedTitle;
     
     // Create description
     const descEl = document.createElement('p');
     descEl.className = 'signupsource-description';
     descEl.style.cssText = 'margin-bottom:25px; color:#555;';
-    descEl.textContent = description;
+    descEl.textContent = resolvedDescription;
     
     // Create check items container
     const itemsContainer = document.createElement('div');
@@ -66,14 +128,14 @@ if (typeof window !== 'undefined') {
     const button = document.createElement('button');
     button.className = 'signupsource-button';
     button.style.cssText = 'width:100%; padding:12px; font-size:16px; font-weight:bold; background-color:#4a69bd; color:white; border:none; border-radius:5px; cursor:pointer; transition:background-color 0.3s;';
-    button.textContent = buttonText;
+    button.textContent = resolvedButtonText;
     button.disabled = true;
     
     // Store other input for later reference
     let otherInput = null;
     
     // Add check items
-    checkItems.forEach(item => {
+    resolvedCheckItems.forEach(item => {
       const itemDiv = document.createElement('div');
       itemDiv.className = 'signupsource-check-item';
       itemDiv.style.cssText = 'display:flex; align-items:center; margin-bottom:12px; padding:8px 10px; border-radius:4px; transition:background-color 0.2s; flex-wrap:wrap;';
@@ -96,15 +158,13 @@ if (typeof window !== 'undefined') {
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'signupsource-other-input';
-        input.placeholder = 'Please specify';
+        input.placeholder = resolvedPlaceholder;
         input.style.cssText = 'flex:1; width:100%; margin-top:8px; margin-left:28px; padding:8px 10px; border:1px solid #ddd; border-radius:4px; font-size:14px; transition:border-color 0.3s;';
         
-        // Show/hide other input based on checkbox state
         checkbox.addEventListener('change', function() {
           if (this.checked) {
             otherInputContainer.style.display = 'block';
             input.focus();
-            // Disable button if other is checked but no text
             button.disabled = input.value.trim() === '';
           } else {
             otherInputContainer.style.display = 'none';
@@ -112,7 +172,6 @@ if (typeof window !== 'undefined') {
           }
         });
         
-        // Enable/disable button based on input
         input.addEventListener('input', function() {
           button.disabled = checkbox.checked && this.value.trim() === '';
         });
@@ -132,7 +191,7 @@ if (typeof window !== 'undefined') {
       if (!apiEndpoint) return;
 
       button.disabled = true;
-      button.textContent = 'Sending...';
+      button.textContent = resolvedSending;
       
       try {
         const payload = {
@@ -140,10 +199,11 @@ if (typeof window !== 'undefined') {
           sources: data,
           timestamp: new Date().toISOString(),
           url: window.location.href,
-          userAgent: navigator.userAgent
+          userAgent: navigator.userAgent,
+          language: lang
         };
 
-        const options = {
+        const fetchOptions = {
           method: apiMethod,
           headers: {
             'Content-Type': 'application/json',
@@ -152,20 +212,15 @@ if (typeof window !== 'undefined') {
         };
 
         if (apiMethod === 'POST') {
-          options.body = JSON.stringify(payload);
+          fetchOptions.body = JSON.stringify(payload);
         }
 
-        const response = await fetch(apiEndpoint, options);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
+        await fetch(apiEndpoint, fetchOptions);
         console.log('SignUpSource: Data sent to API successfully');
       } catch (error) {
         console.error('SignUpSource: Failed to send data to API:', error);
       } finally {
-        button.textContent = buttonText;
+        button.textContent = resolvedButtonText;
         button.disabled = false;
       }
     };
@@ -180,7 +235,8 @@ if (typeof window !== 'undefined') {
           websiteId: id,
           sources: data,
           timestamp: new Date().toISOString(),
-          url: window.location.href
+          url: window.location.href,
+          language: lang
         };
         existingData.push(newEntry);
         localStorage.setItem(localStorageKey, JSON.stringify(existingData));
@@ -194,8 +250,7 @@ if (typeof window !== 'undefined') {
     button.addEventListener('click', () => {
       const selectedItems = [];
       
-      // Collect checked items
-      checkItems.forEach(item => {
+      resolvedCheckItems.forEach(item => {
         const checkbox = document.getElementById(`signupsource-${item.id}`);
         if (checkbox && checkbox.checked) {
           if (item.id === 'other') {
@@ -219,32 +274,26 @@ if (typeof window !== 'undefined') {
       const submissionData = {
         websiteId: id,
         sources: selectedItems,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        language: lang
       };
       
-      // Call callback if provided
       if (callback && typeof callback === 'function') {
         callback(submissionData);
       }
       
-      // Send to API if configured
       if (apiEndpoint) {
         sendToApi(selectedItems);
       }
       
-      // Store locally if enabled
       if (storeLocal) {
         storeLocally(selectedItems);
       }
 
-      // Default behavior - log to console if no API and no callback
       if (!callback && !apiEndpoint && !storeLocal) {
-        console.log('SignUpSource: Sending data to server');
-        console.log('Website ID:', id);
-        console.log('User checked items:', selectedItems);
+        console.log('SignUpSource:', submissionData);
       }
       
-      // Remove modal
       container.removeChild(modal);
     });
     

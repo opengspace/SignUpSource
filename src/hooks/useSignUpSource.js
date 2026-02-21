@@ -16,6 +16,8 @@ import { useState, useEffect } from 'react';
  * @param {Object} options.apiHeaders - Custom headers for API request
  * @param {boolean} options.storeLocal - Store data in localStorage
  * @param {string} options.localStorageKey - Key for localStorage
+ * @param {string} options.language - Language: 'en', 'zh', 'ja', 'auto' (default: 'auto')
+ * @param {Object} options.translations - Custom translations
  * @returns {Object} - Hook return object
  */
 const useSignUpSource = (options = {}) => {
@@ -24,31 +26,37 @@ const useSignUpSource = (options = {}) => {
   
   const {
     id = '',
-    title = 'Where did you hear about us?',
-    description = 'Please let us know how you found our website.',
-    buttonText = 'Submit',
-    checkItems = [
-      { id: 'google', label: 'Google Search' },
-      { id: 'social', label: 'Social Media' },
-      { id: 'friend', label: 'Friend Recommendation' },
-      { id: 'blog', label: 'Blog or Article' },
-      { id: 'other', label: 'Other' }
-    ],
+    title = '',
+    description = '',
+    buttonText = '',
+    checkItems = [],
     callback,
     showOnlyOnce = true,
     apiEndpoint = '',
     apiMethod = 'POST',
     apiHeaders = {},
     storeLocal = false,
-    localStorageKey = 'signupsource_data'
+    localStorageKey = 'signupsource_data',
+    language = 'auto',
+    translations = {}
   } = options;
+
+  // Get detected language
+  const getLanguage = () => {
+    if (language !== 'auto') return language;
+    const browserLang = navigator.language || navigator.userLanguage;
+    if (browserLang.startsWith('zh')) return 'zh';
+    if (browserLang.startsWith('ja')) return 'ja';
+    return 'en';
+  };
+
+  const detectedLang = getLanguage();
 
   // Check if the user is new
   useEffect(() => {
     const isReturningUser = localStorage.getItem('signupsource_returning_user');
     
     if (!isReturningUser && !hasShown) {
-      // Open modal for new users
       setIsOpen(true);
       setHasShown(true);
     }
@@ -64,10 +72,11 @@ const useSignUpSource = (options = {}) => {
         sources: data,
         timestamp: new Date().toISOString(),
         url: typeof window !== 'undefined' ? window.location.href : '',
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        language: detectedLang
       };
 
-      const options = {
+      const fetchOptions = {
         method: apiMethod,
         headers: {
           'Content-Type': 'application/json',
@@ -76,10 +85,10 @@ const useSignUpSource = (options = {}) => {
       };
 
       if (apiMethod === 'POST') {
-        options.body = JSON.stringify(payload);
+        fetchOptions.body = JSON.stringify(payload);
       }
 
-      const response = await fetch(apiEndpoint, options);
+      const response = await fetch(apiEndpoint, fetchOptions);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -103,7 +112,8 @@ const useSignUpSource = (options = {}) => {
         websiteId: id,
         sources: data,
         timestamp: new Date().toISOString(),
-        url: typeof window !== 'undefined' ? window.location.href : ''
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        language: detectedLang
       };
       existingData.push(newEntry);
       localStorage.setItem(localStorageKey, JSON.stringify(existingData));
@@ -119,7 +129,6 @@ const useSignUpSource = (options = {}) => {
   const closeModal = () => {
     setIsOpen(false);
     
-    // If showOnlyOnce is true, mark the user as returning
     if (showOnlyOnce) {
       localStorage.setItem('signupsource_returning_user', 'true');
     }
@@ -130,41 +139,33 @@ const useSignUpSource = (options = {}) => {
     const submissionData = {
       websiteId: id,
       sources: selectedItems,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      language: detectedLang
     };
     
-    // Call the provided callback
     if (callback && typeof callback === 'function') {
       callback(submissionData);
     }
     
-    // Send to API if configured
     if (apiEndpoint) {
       await sendToApi(selectedItems);
     }
     
-    // Store locally if enabled
     if (storeLocal) {
       storeLocally(selectedItems);
     }
 
-    // Default behavior - log to console if no API and no callback
     if (!callback && !apiEndpoint && !storeLocal) {
-      console.log('SignUpSource: Sending data to server');
-      console.log('Website ID:', id);
-      console.log('User checked items:', selectedItems);
+      console.log('SignUpSource:', submissionData);
     }
     
-    // Close the modal
     closeModal();
   };
 
-  // For testing purposes - open the modal manually
   const openModal = () => {
     setIsOpen(true);
   };
 
-  // Reset the user's status (for testing)
   const resetUser = () => {
     localStorage.removeItem('signupsource_returning_user');
     setHasShown(false);
@@ -188,7 +189,9 @@ const useSignUpSource = (options = {}) => {
       apiMethod,
       apiHeaders,
       storeLocal,
-      localStorageKey
+      localStorageKey,
+      language,
+      translations
     }
   };
 };

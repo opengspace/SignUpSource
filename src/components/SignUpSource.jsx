@@ -18,19 +18,15 @@ import './SignUpSource.css';
  * @param {Object} props.apiHeaders - Custom headers for API request
  * @param {boolean} props.storeLocal - Store data in localStorage
  * @param {string} props.localStorageKey - Key for localStorage, default 'signupsource_data'
+ * @param {string} props.language - Language code: 'en', 'zh', 'ja', 'auto' (default: 'auto')
+ * @param {Object} props.translations - Custom translations override
  */
 const SignUpSource = ({ 
   id = '',
-  title = 'Where did you hear about us?',
-  description = 'Please let us know how you found our website.',
-  buttonText = 'Submit',
-  checkItems = [
-    { id: 'google', label: 'Google Search' },
-    { id: 'social', label: 'Social Media' },
-    { id: 'friend', label: 'Friend Recommendation' },
-    { id: 'blog', label: 'Blog or Article' },
-    { id: 'other', label: 'Other' }
-  ],
+  title = '',
+  description = '',
+  buttonText = '',
+  checkItems = [],
   callback,
   isOpen,
   onClose,
@@ -38,12 +34,82 @@ const SignUpSource = ({
   apiMethod = 'POST',
   apiHeaders = {},
   storeLocal = false,
-  localStorageKey = 'signupsource_data'
+  localStorageKey = 'signupsource_data',
+  language = 'auto',
+  translations = {}
 }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [otherSource, setOtherSource] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const otherInputRef = useRef(null);
+
+  // Default translations
+  const defaultTranslations = {
+    en: {
+      title: 'Where did you hear about us?',
+      description: 'Please let us know how you found our website.',
+      buttonText: 'Submit',
+      placeholder: 'Please specify',
+      sending: 'Sending...',
+      defaultCheckItems: [
+        { id: 'google', label: 'Google Search' },
+        { id: 'social', label: 'Social Media' },
+        { id: 'friend', label: 'Friend Recommendation' },
+        { id: 'blog', label: 'Blog or Article' },
+        { id: 'other', label: 'Other' }
+      ]
+    },
+    zh: {
+      title: '您是从哪里了解到我们的？',
+      description: '请告诉我们您是如何找到我们的网站的。',
+      buttonText: '提交',
+      placeholder: '请输入其他来源',
+      sending: '提交中...',
+      defaultCheckItems: [
+        { id: 'google', label: '谷歌搜索' },
+        { id: 'social', label: '社交媒体' },
+        { id: 'friend', label: '朋友推荐' },
+        { id: 'blog', label: '博客或文章' },
+        { id: 'other', label: '其他' }
+      ]
+    },
+    ja: {
+      title: 'どこで私たちを知りましたか？',
+      description: 'どのように 우리 사이트를 찾으셨는지 알려주세요.',
+      buttonText: '送信',
+      placeholder: '具体的に入力',
+      sending: '送信中...',
+      defaultCheckItems: [
+        { id: 'google', label: 'Google検索' },
+        { id: 'social', label: 'ソーシャルメディア' },
+        { id: 'friend', label: '友人のおすすめ' },
+        { id: 'blog', label: 'ブログ・記事' },
+        { id: 'other', label: 'その他' }
+      ]
+    }
+  };
+
+  // Determine which language to use
+  const getLanguage = () => {
+    if (language !== 'auto') return language;
+    
+    // Auto-detect from browser
+    const browserLang = navigator.language || navigator.userLanguage;
+    if (browserLang.startsWith('zh')) return 'zh';
+    if (browserLang.startsWith('ja')) return 'ja';
+    return 'en';
+  };
+
+  // Get merged translations
+  const lang = getLanguage();
+  const t = { ...defaultTranslations[lang], ...translations };
+
+  // Resolve title - use prop or default translation
+  const resolvedTitle = title || t.title;
+  const resolvedDescription = description || t.description;
+  const resolvedButtonText = buttonText || t.buttonText;
+  const resolvedPlaceholder = t.placeholder;
+  const resolvedCheckItems = checkItems.length > 0 ? checkItems : t.defaultCheckItems;
 
   // Reset selected items when modal opens
   useEffect(() => {
@@ -73,7 +139,6 @@ const SignUpSource = ({
       setSelectedItems(prev => [...prev, item]);
     } else {
       setSelectedItems(prev => prev.filter(i => i.id !== item.id));
-      // Clear other source if "Other" is unchecked
       if (item.id === 'other') {
         setOtherSource('');
       }
@@ -92,7 +157,8 @@ const SignUpSource = ({
         sources: data,
         timestamp: new Date().toISOString(),
         url: typeof window !== 'undefined' ? window.location.href : '',
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        language: lang
       };
 
       const options = {
@@ -105,20 +171,9 @@ const SignUpSource = ({
 
       if (apiMethod === 'POST') {
         options.body = JSON.stringify(payload);
-      } else {
-        // For GET, append data as query params
-        const params = new URLSearchParams(payload).toString();
-        const separator = apiEndpoint.includes('?') ? '&' : '?';
-        // eslint-disable-next-line no-param-reassign
-        apiEndpoint + separator + params;
       }
 
-      const response = await fetch(apiEndpoint, options);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      await fetch(apiEndpoint, options);
       console.log('SignUpSource: Data sent to API successfully');
     } catch (error) {
       console.error('SignUpSource: Failed to send data to API:', error);
@@ -137,7 +192,8 @@ const SignUpSource = ({
         websiteId: id,
         sources: data,
         timestamp: new Date().toISOString(),
-        url: typeof window !== 'undefined' ? window.location.href : ''
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        language: lang
       };
       existingData.push(newEntry);
       localStorage.setItem(localStorageKey, JSON.stringify(existingData));
@@ -151,7 +207,6 @@ const SignUpSource = ({
   const handleSubmit = () => {
     let itemsToSend = [...selectedItems];
     
-    // Replace the "Other" item with custom label if provided
     if (selectedItems.some(item => item.id === 'other') && otherSource.trim() !== '') {
       itemsToSend = itemsToSend.map(item => {
         if (item.id === 'other') {
@@ -161,39 +216,32 @@ const SignUpSource = ({
       });
     }
 
-    // Prepare the final data
     const submissionData = {
       websiteId: id,
       sources: itemsToSend,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      language: lang
     };
     
-    // Call custom callback if provided
     if (callback && typeof callback === 'function') {
       callback(submissionData);
     }
     
-    // Send to API endpoint if configured
     if (apiEndpoint) {
       sendToApi(itemsToSend);
     }
     
-    // Store locally if enabled
     if (storeLocal) {
       storeLocally(itemsToSend);
     }
 
-    // Default behavior - log to console if no API and no callback
     if (!callback && !apiEndpoint && !storeLocal) {
-      console.log('SignUpSource: Sending data to server');
-      console.log('Website ID:', id);
-      console.log('User checked items:', itemsToSend);
+      console.log('SignUpSource:', submissionData);
     }
     
     onClose();
   };
 
-  // Check if submit should be disabled
   const isOtherSelected = selectedItems.some(item => item.id === 'other');
   const isSubmitDisabled = isOtherSelected && otherSource.trim() === '';
 
@@ -202,11 +250,11 @@ const SignUpSource = ({
   return (
     <div className="signupsource-modal" onClick={handleBackdropClick}>
       <div className="signupsource-modal-content">
-        <h2 className="signupsource-title">{title}</h2>
-        <p className="signupsource-description">{description}</p>
+        <h2 className="signupsource-title">{resolvedTitle}</h2>
+        <p className="signupsource-description">{resolvedDescription}</p>
         
         <div className="signupsource-check-items">
-          {checkItems.map((item) => (
+          {resolvedCheckItems.map((item) => (
             <div key={item.id} className="signupsource-check-item">
               <input
                 type="checkbox"
@@ -216,13 +264,12 @@ const SignUpSource = ({
               />
               <label htmlFor={`signupsource-${item.id}`}>{item.label}</label>
               
-              {/* Add text input for "Other" option */}
               {item.id === 'other' && selectedItems.some(i => i.id === 'other') && (
                 <input
                   type="text"
                   ref={otherInputRef}
                   className="signupsource-other-input"
-                  placeholder="Please specify"
+                  placeholder={resolvedPlaceholder}
                   value={otherSource}
                   onChange={(e) => setOtherSource(e.target.value)}
                 />
@@ -236,7 +283,7 @@ const SignUpSource = ({
           onClick={handleSubmit}
           disabled={isSubmitDisabled || isSubmitting}
         >
-          {isSubmitting ? 'Sending...' : buttonText}
+          {isSubmitting ? t.sending : resolvedButtonText}
         </button>
       </div>
     </div>
